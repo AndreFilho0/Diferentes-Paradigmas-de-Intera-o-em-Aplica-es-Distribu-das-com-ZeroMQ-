@@ -1,0 +1,63 @@
+---
+# Provisiona todas as instancias para rodar as aplicacoes ZeroMQ:
+#   - instala Python 3, pip e git
+#   - copia o codigo das aplicacoes (app/) para ~/zmq/app
+#   - cria um virtualenv em ~/zmq/.venv e instala o pyzmq
+#   - exporta ZMQ_HOST (IP privado do coordenador) no shell de todos os nos
+#
+# Idempotente: pode rodar quantas vezes quiser.
+
+- name: Provisiona nos ZeroMQ
+  hosts: all
+  become: true
+
+  vars:
+    app_user: ec2-user
+    app_dir: /home/ec2-user/zmq
+
+  tasks:
+    - name: Instala Python, pip e git
+      ansible.builtin.dnf:
+        name:
+          - python3
+          - python3-pip
+          - git
+        state: present
+
+    - name: Cria o diretorio da aplicacao
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Copia o codigo das aplicacoes
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../app/"
+        dest: "{{ app_dir }}/app/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Cria o virtualenv e instala o pyzmq
+      become_user: "{{ app_user }}"
+      ansible.builtin.pip:
+        name: pyzmq
+        virtualenv: "{{ app_dir }}/.venv"
+        virtualenv_command: python3 -m venv
+
+    - name: Exporta ZMQ_HOST e um atalho para ativar o venv
+      ansible.builtin.copy:
+        dest: /etc/profile.d/zmq.sh
+        mode: "0644"
+        content: |
+          # Gerado pelo Ansible (projeto ZeroMQ).
+          export ZMQ_HOST={{ coordinator_private_ip }}
+          alias zmq='cd {{ app_dir }} && source .venv/bin/activate'
+
+    - name: Mostra como entrar no ambiente
+      ansible.builtin.debug:
+        msg: >-
+          Pronto em {{ inventory_hostname }} (role={{ 'coordenador' if inventory_hostname in groups['coordinator'] else 'no' }}).
+          ZMQ_HOST={{ coordinator_private_ip }}. Entre com SSH e digite 'zmq' para ativar o ambiente.

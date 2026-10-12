@@ -1,0 +1,13 @@
+[coordinator]
+${coordinator_ip} node_name=coordenador
+
+[nodes]
+%{ for ip in node_ips ~}
+${ip}
+%{ endfor ~}
+
+[all:vars]
+ansible_user=ec2-user
+ansible_ssh_private_key_file=${key_path}
+ansible_ssh_common_args=-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+coordinator_private_ip=${coordinator_private}
